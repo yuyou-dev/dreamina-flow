@@ -84,7 +84,7 @@ describe("dreamina-adapter", () => {
     expect(auth.message).toBeNull();
   });
 
-  it("keeps login as a no-op when the CLI is already authenticated", async () => {
+  it("keeps login as a no-op when cached auth already says the CLI is authenticated", async () => {
     const resolvedCli = "/usr/local/bin/dreamina";
     const runCli = vi.fn(async (command: string, args: string[]) => {
       if (command === "which" && args[0] === "dreamina") {
@@ -119,10 +119,59 @@ describe("dreamina-adapter", () => {
       randomId: () => "session-login",
     });
 
+    const auth = await service.getAuthStatus(true);
+    expect(auth.loggedIn).toBe(true);
+
     const session = await service.startLoginSession("login");
     expect(session.phase).toBe("success");
     expect(session.message).toBe("Dreamina is already logged in.");
     expect(createInteractiveSession).not.toHaveBeenCalled();
+  });
+
+  it("starts a fresh headless login without forcing user_credit first and uses the configured command name", async () => {
+    const resolvedCli = "/usr/local/bin/dreamina";
+    const runCli = vi.fn(async (command: string, args: string[]) => {
+      if (command === "which" && args[0] === "dreamina") {
+        return {
+          ok: true,
+          stdout: resolvedCli,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      if (args[0] === "user_credit") {
+        throw new Error("user_credit should not run before a fresh headless login starts");
+      }
+
+      throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+    });
+
+    const createInteractiveSession = vi.fn(() => ({
+      onData() {},
+      onExit() {},
+      write() {},
+      kill() {},
+    }));
+
+    const service = createDreaminaAuthService({
+      runCli,
+      createInteractiveSession,
+      randomId: () => "session-fresh-login",
+    });
+
+    const session = await service.startLoginSession("login");
+
+    expect(session.phase).toBe("pending");
+    expect(createInteractiveSession).toHaveBeenCalledWith(
+      "dreamina",
+      ["login", "--headless"],
+      expect.objectContaining({
+        cols: 100,
+        rows: 36,
+      }),
+    );
+    expect(runCli).not.toHaveBeenCalled();
   });
 
   it("tracks a headless relogin session and refreshes auth state on success", async () => {

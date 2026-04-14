@@ -368,8 +368,10 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
 
   async function startLoginSession(mode: AdapterLoginMode): Promise<AdapterLoginSession> {
     if (mode === "login") {
-      const auth = await getAuthStatus(true);
-      if (auth.loggedIn) {
+      // Avoid forcing a fresh `user_credit` probe right before `login --headless`.
+      // In practice, the Dreamina CLI can fail to emit the QR session after that probe,
+      // so only trust the cached auth snapshot if we already have one.
+      if (authCache?.loggedIn) {
         const startedAtDate = now();
         const startedAt = startedAtDate.toISOString();
         const startedAtMs = startedAtDate.getTime();
@@ -403,8 +405,10 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     registerSession(session);
 
     try {
-      const resolvedCliBin = await resolveCliBin();
-      const sessionProcess = createSessionFn(resolvedCliBin, [mode, "--headless"], {
+      // Interactive headless login is more reliable when launched with the configured
+      // command name instead of the `which`-resolved absolute path.
+      const interactiveCliBin = cliBin;
+      const sessionProcess = createSessionFn(interactiveCliBin, [mode, "--headless"], {
         cwd: REPO_ROOT,
         env: process.env,
         cols: 100,
