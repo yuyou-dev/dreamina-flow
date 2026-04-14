@@ -1,0 +1,24 @@
+{
+  "name": "@workflow-studio/dreamina-adapter",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@workflow-studio/workflow-core": "file:../workflow-core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  }
+}

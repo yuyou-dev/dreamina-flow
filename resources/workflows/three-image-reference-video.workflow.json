@@ -1,0 +1,261 @@
+{
+  "schema": "workflow.document/v1alpha1",
+  "version": 1,
+  "meta": {
+    "id": "three-image-reference-video",
+    "title": "Three Image Reference Video",
+    "summary": "Generate three still-image references and feed them into a multimodal video workflow.",
+    "tags": [
+      "demo",
+      "multimodal2video",
+      "reference-video",
+      "multi-image"
+    ],
+    "difficulty": "intermediate",
+    "intendedShowcase": "Many-to-one reference gathering into a multimodal video node.",
+    "createdWith": {
+      "app": "workflow-studio-web",
+      "cliVersion": null,
+      "wrapperVersion": null
+    },
+    "requirements": {
+      "nodeTypes": [
+        "input_text",
+        "multimodal2video",
+        "output_video",
+        "text2image"
+      ],
+      "cliVersion": null,
+      "wrapperVersion": null
+    }
+  },
+  "viewport": {
+    "x": -40,
+    "y": 40,
+    "zoom": 0.76
+  },
+  "groups": [
+    {
+      "id": "sources",
+      "label": "Sources",
+      "nodeIds": [
+        "p1",
+        "p2",
+        "p3",
+        "video_prompt"
+      ],
+      "color": "#dcff39"
+    },
+    {
+      "id": "reference-builders",
+      "label": "Reference Builders",
+      "nodeIds": [
+        "g1",
+        "g2",
+        "g3"
+      ],
+      "color": "#1fe0f2"
+    },
+    {
+      "id": "video-merge",
+      "label": "Video Merge",
+      "nodeIds": [
+        "reference_video",
+        "video_output"
+      ],
+      "color": "#ef8ae8"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "p1",
+      "nodeType": "input_text",
+      "position": {
+        "x": 80,
+        "y": 40
+      },
+      "label": "Reference Prompt A",
+      "params": {},
+      "values": {
+        "text": "A silver ring under cool blue spotlights, premium product photography."
+      }
+    },
+    {
+      "id": "p2",
+      "nodeType": "input_text",
+      "position": {
+        "x": 80,
+        "y": 220
+      },
+      "label": "Reference Prompt B",
+      "params": {},
+      "values": {
+        "text": "A silver ring on a marble pedestal, luxury catalog aesthetic."
+      }
+    },
+    {
+      "id": "p3",
+      "nodeType": "input_text",
+      "position": {
+        "x": 80,
+        "y": 400
+      },
+      "label": "Reference Prompt C",
+      "params": {},
+      "values": {
+        "text": "A silver ring in an atmospheric close-up, cinematic haze and warm highlights."
+      }
+    },
+    {
+      "id": "g1",
+      "nodeType": "text2image",
+      "position": {
+        "x": 420,
+        "y": 20
+      },
+      "label": "Reference Image A",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "g2",
+      "nodeType": "text2image",
+      "position": {
+        "x": 420,
+        "y": 200
+      },
+      "label": "Reference Image B",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "g3",
+      "nodeType": "text2image",
+      "position": {
+        "x": 420,
+        "y": 380
+      },
+      "label": "Reference Image C",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "video_prompt",
+      "nodeType": "input_text",
+      "position": {
+        "x": 760,
+        "y": 220
+      },
+      "label": "Video Direction",
+      "note": "Guides the multimodal video synthesis after the still-image references are prepared.",
+      "params": {},
+      "values": {
+        "text": "Animate the references into a slow orbit shot with elegant luxury motion and soft reflections."
+      }
+    },
+    {
+      "id": "reference_video",
+      "nodeType": "multimodal2video",
+      "position": {
+        "x": 1090,
+        "y": 150
+      },
+      "label": "Reference Video Merge",
+      "params": {
+        "duration": 5,
+        "ratio": "16:9",
+        "video_resolution": "720p",
+        "model_version": "seedance2.0fast",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "video_output",
+      "nodeType": "output_video",
+      "position": {
+        "x": 1470,
+        "y": 180
+      },
+      "label": "Video Preview",
+      "params": {},
+      "values": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "p1",
+      "sourceHandle": "text",
+      "target": "g1",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e2",
+      "source": "p2",
+      "sourceHandle": "text",
+      "target": "g2",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e3",
+      "source": "p3",
+      "sourceHandle": "text",
+      "target": "g3",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e4",
+      "source": "g1",
+      "sourceHandle": "image",
+      "target": "reference_video",
+      "targetHandle": "image",
+      "order": 0
+    },
+    {
+      "id": "e5",
+      "source": "g2",
+      "sourceHandle": "image",
+      "target": "reference_video",
+      "targetHandle": "image",
+      "order": 1
+    },
+    {
+      "id": "e6",
+      "source": "g3",
+      "sourceHandle": "image",
+      "target": "reference_video",
+      "targetHandle": "image",
+      "order": 2
+    },
+    {
+      "id": "e7",
+      "source": "video_prompt",
+      "sourceHandle": "text",
+      "target": "reference_video",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e8",
+      "source": "reference_video",
+      "sourceHandle": "video",
+      "target": "video_output",
+      "targetHandle": "video"
+    }
+  ]
+}

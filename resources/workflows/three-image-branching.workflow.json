@@ -1,0 +1,421 @@
+{
+  "schema": "workflow.document/v1alpha1",
+  "version": 1,
+  "meta": {
+    "id": "three-image-branching",
+    "title": "Three Image Branching",
+    "summary": "Generate three images, merge them into both image refinement and multi-frame video branches, then fan out to image and video outputs.",
+    "tags": [
+      "demo",
+      "branching",
+      "multi-image",
+      "multiframe2video"
+    ],
+    "difficulty": "advanced",
+    "intendedShowcase": "Many-to-one image merging, ordered multi-inputs, and one-to-many output branching.",
+    "createdWith": {
+      "app": "workflow-studio-web",
+      "cliVersion": null,
+      "wrapperVersion": null
+    },
+    "requirements": {
+      "nodeTypes": [
+        "image2image",
+        "image_upscale",
+        "input_text",
+        "multiframe2video",
+        "output_image",
+        "output_video",
+        "text2image"
+      ],
+      "cliVersion": null,
+      "wrapperVersion": null
+    }
+  },
+  "viewport": {
+    "x": -90,
+    "y": 10,
+    "zoom": 0.72
+  },
+  "groups": [
+    {
+      "id": "sources",
+      "label": "Sources",
+      "nodeIds": [
+        "p1",
+        "p2",
+        "p3",
+        "merge_prompt",
+        "t1",
+        "t2"
+      ],
+      "color": "#dcff39"
+    },
+    {
+      "id": "image-generators",
+      "label": "Image Generators",
+      "nodeIds": [
+        "g1",
+        "g2",
+        "g3"
+      ],
+      "color": "#1fe0f2"
+    },
+    {
+      "id": "merge-branches",
+      "label": "Merge Branches",
+      "nodeIds": [
+        "image_merge",
+        "story_video",
+        "upscale"
+      ],
+      "color": "#ef8ae8"
+    },
+    {
+      "id": "outputs",
+      "label": "Outputs",
+      "nodeIds": [
+        "main_output",
+        "detail_output",
+        "video_output"
+      ],
+      "color": "#ff922f"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "p1",
+      "nodeType": "input_text",
+      "position": {
+        "x": 60,
+        "y": 40
+      },
+      "label": "Shot Prompt A",
+      "note": "First visual seed for the branching workflow.",
+      "params": {},
+      "values": {
+        "text": "A cinematic silver ring floating over black velvet, dramatic studio rim light."
+      }
+    },
+    {
+      "id": "p2",
+      "nodeType": "input_text",
+      "position": {
+        "x": 60,
+        "y": 220
+      },
+      "label": "Shot Prompt B",
+      "note": "Second visual seed with a brighter product mood.",
+      "params": {},
+      "values": {
+        "text": "A luxury silver ring on reflective acrylic, premium catalog lighting, soft reflections."
+      }
+    },
+    {
+      "id": "p3",
+      "nodeType": "input_text",
+      "position": {
+        "x": 60,
+        "y": 400
+      },
+      "label": "Shot Prompt C",
+      "note": "Third seed used to give the merge steps more stylistic range.",
+      "params": {},
+      "values": {
+        "text": "A sculptural silver ring suspended in haze, editorial close-up, moody highlights."
+      }
+    },
+    {
+      "id": "g1",
+      "nodeType": "text2image",
+      "position": {
+        "x": 390,
+        "y": 20
+      },
+      "label": "Generator A",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "g2",
+      "nodeType": "text2image",
+      "position": {
+        "x": 390,
+        "y": 200
+      },
+      "label": "Generator B",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "g3",
+      "nodeType": "text2image",
+      "position": {
+        "x": 390,
+        "y": 380
+      },
+      "label": "Generator C",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "merge_prompt",
+      "nodeType": "input_text",
+      "position": {
+        "x": 720,
+        "y": 120
+      },
+      "label": "Refine Prompt",
+      "note": "Guides the multi-image merge into a single polished hero image.",
+      "params": {},
+      "values": {
+        "text": "Merge the references into one polished hero shot with sharp metal detail and cohesive lighting."
+      }
+    },
+    {
+      "id": "image_merge",
+      "nodeType": "image2image",
+      "position": {
+        "x": 1040,
+        "y": 120
+      },
+      "label": "Image Merge",
+      "note": "Collects the three generated images into a single refined image.",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "4.0",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "t1",
+      "nodeType": "input_text",
+      "position": {
+        "x": 720,
+        "y": 500
+      },
+      "label": "Transition Prompt A",
+      "params": {},
+      "values": {
+        "text": "Transition from moody hero lighting into a bright luxury tabletop reveal."
+      }
+    },
+    {
+      "id": "t2",
+      "nodeType": "input_text",
+      "position": {
+        "x": 720,
+        "y": 660
+      },
+      "label": "Transition Prompt B",
+      "params": {},
+      "values": {
+        "text": "Transition from tabletop reveal into an atmospheric editorial close-up."
+      }
+    },
+    {
+      "id": "story_video",
+      "nodeType": "multiframe2video",
+      "position": {
+        "x": 1040,
+        "y": 430
+      },
+      "label": "Story Video",
+      "note": "Ordered image inputs plus transition prompts create a mini sequence.",
+      "params": {
+        "transition_duration": [
+          2,
+          2
+        ],
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "upscale",
+      "nodeType": "image_upscale",
+      "position": {
+        "x": 1370,
+        "y": 250
+      },
+      "label": "Detail Upscale",
+      "params": {
+        "resolution_type": "4k",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "main_output",
+      "nodeType": "output_image",
+      "position": {
+        "x": 1700,
+        "y": 110
+      },
+      "label": "Hero Preview",
+      "params": {},
+      "values": {}
+    },
+    {
+      "id": "detail_output",
+      "nodeType": "output_image",
+      "position": {
+        "x": 1700,
+        "y": 290
+      },
+      "label": "Upscaled Preview",
+      "params": {},
+      "values": {}
+    },
+    {
+      "id": "video_output",
+      "nodeType": "output_video",
+      "position": {
+        "x": 1700,
+        "y": 500
+      },
+      "label": "Sequence Preview",
+      "params": {},
+      "values": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "p1",
+      "sourceHandle": "text",
+      "target": "g1",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e2",
+      "source": "p2",
+      "sourceHandle": "text",
+      "target": "g2",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e3",
+      "source": "p3",
+      "sourceHandle": "text",
+      "target": "g3",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e4",
+      "source": "g1",
+      "sourceHandle": "image",
+      "target": "image_merge",
+      "targetHandle": "images",
+      "order": 0
+    },
+    {
+      "id": "e5",
+      "source": "g2",
+      "sourceHandle": "image",
+      "target": "image_merge",
+      "targetHandle": "images",
+      "order": 1
+    },
+    {
+      "id": "e6",
+      "source": "g3",
+      "sourceHandle": "image",
+      "target": "image_merge",
+      "targetHandle": "images",
+      "order": 2
+    },
+    {
+      "id": "e7",
+      "source": "merge_prompt",
+      "sourceHandle": "text",
+      "target": "image_merge",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e8",
+      "source": "g1",
+      "sourceHandle": "image",
+      "target": "story_video",
+      "targetHandle": "images",
+      "order": 0
+    },
+    {
+      "id": "e9",
+      "source": "g2",
+      "sourceHandle": "image",
+      "target": "story_video",
+      "targetHandle": "images",
+      "order": 1
+    },
+    {
+      "id": "e10",
+      "source": "g3",
+      "sourceHandle": "image",
+      "target": "story_video",
+      "targetHandle": "images",
+      "order": 2
+    },
+    {
+      "id": "e11",
+      "source": "t1",
+      "sourceHandle": "text",
+      "target": "story_video",
+      "targetHandle": "transition_prompt",
+      "order": 0
+    },
+    {
+      "id": "e12",
+      "source": "t2",
+      "sourceHandle": "text",
+      "target": "story_video",
+      "targetHandle": "transition_prompt",
+      "order": 1
+    },
+    {
+      "id": "e13",
+      "source": "image_merge",
+      "sourceHandle": "image",
+      "target": "main_output",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e14",
+      "source": "image_merge",
+      "sourceHandle": "image",
+      "target": "upscale",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e15",
+      "source": "upscale",
+      "sourceHandle": "image",
+      "target": "detail_output",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e16",
+      "source": "story_video",
+      "sourceHandle": "video",
+      "target": "video_output",
+      "targetHandle": "video"
+    }
+  ]
+}

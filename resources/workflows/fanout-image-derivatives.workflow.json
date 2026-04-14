@@ -1,0 +1,228 @@
+{
+  "schema": "workflow.document/v1alpha1",
+  "version": 1,
+  "meta": {
+    "id": "fanout-image-derivatives",
+    "title": "Fanout Image Derivatives",
+    "summary": "Create one image and branch it into direct preview, upscale, and image-to-video derivative outputs.",
+    "tags": [
+      "demo",
+      "fanout",
+      "image2video",
+      "image_upscale"
+    ],
+    "difficulty": "intermediate",
+    "intendedShowcase": "One-to-many branching from a single generated image.",
+    "createdWith": {
+      "app": "workflow-studio-web",
+      "cliVersion": null,
+      "wrapperVersion": null
+    },
+    "requirements": {
+      "nodeTypes": [
+        "image2video",
+        "image_upscale",
+        "input_text",
+        "output_image",
+        "output_video",
+        "text2image"
+      ],
+      "cliVersion": null,
+      "wrapperVersion": null
+    }
+  },
+  "viewport": {
+    "x": -40,
+    "y": 10,
+    "zoom": 0.82
+  },
+  "groups": [
+    {
+      "id": "sources",
+      "label": "Sources",
+      "nodeIds": [
+        "prompt",
+        "motion_prompt"
+      ],
+      "color": "#dcff39"
+    },
+    {
+      "id": "main-branch",
+      "label": "Main Branch",
+      "nodeIds": [
+        "generator",
+        "preview"
+      ],
+      "color": "#1fe0f2"
+    },
+    {
+      "id": "derivatives",
+      "label": "Derivatives",
+      "nodeIds": [
+        "upscale",
+        "upscale_output",
+        "video_branch",
+        "video_output"
+      ],
+      "color": "#ef8ae8"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "prompt",
+      "nodeType": "input_text",
+      "position": {
+        "x": 70,
+        "y": 90
+      },
+      "label": "Master Prompt",
+      "params": {},
+      "values": {
+        "text": "A silver ring on smoked glass with elegant luxury reflections, hero product composition."
+      }
+    },
+    {
+      "id": "generator",
+      "nodeType": "text2image",
+      "position": {
+        "x": 420,
+        "y": 80
+      },
+      "label": "Hero Generator",
+      "params": {
+        "ratio": "16:9",
+        "resolution_type": "2k",
+        "model_version": "3.1",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "preview",
+      "nodeType": "output_image",
+      "position": {
+        "x": 770,
+        "y": 10
+      },
+      "label": "Base Preview",
+      "params": {},
+      "values": {}
+    },
+    {
+      "id": "upscale",
+      "nodeType": "image_upscale",
+      "position": {
+        "x": 770,
+        "y": 180
+      },
+      "label": "Upscale Branch",
+      "params": {
+        "resolution_type": "4k",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "upscale_output",
+      "nodeType": "output_image",
+      "position": {
+        "x": 1110,
+        "y": 180
+      },
+      "label": "Upscaled Preview",
+      "params": {},
+      "values": {}
+    },
+    {
+      "id": "motion_prompt",
+      "nodeType": "input_text",
+      "position": {
+        "x": 770,
+        "y": 420
+      },
+      "label": "Motion Prompt",
+      "params": {},
+      "values": {
+        "text": "Turn the hero shot into a slow parallax move with subtle luxury reflections and shallow depth of field."
+      }
+    },
+    {
+      "id": "video_branch",
+      "nodeType": "image2video",
+      "position": {
+        "x": 1110,
+        "y": 330
+      },
+      "label": "Video Branch",
+      "params": {
+        "duration": 5,
+        "video_resolution": "1080p",
+        "model_version": "3.0",
+        "poll": 180
+      },
+      "values": {}
+    },
+    {
+      "id": "video_output",
+      "nodeType": "output_video",
+      "position": {
+        "x": 1470,
+        "y": 350
+      },
+      "label": "Video Preview",
+      "params": {},
+      "values": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "prompt",
+      "sourceHandle": "text",
+      "target": "generator",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e2",
+      "source": "generator",
+      "sourceHandle": "image",
+      "target": "preview",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e3",
+      "source": "generator",
+      "sourceHandle": "image",
+      "target": "upscale",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e4",
+      "source": "upscale",
+      "sourceHandle": "image",
+      "target": "upscale_output",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e5",
+      "source": "generator",
+      "sourceHandle": "image",
+      "target": "video_branch",
+      "targetHandle": "image"
+    },
+    {
+      "id": "e6",
+      "source": "motion_prompt",
+      "sourceHandle": "text",
+      "target": "video_branch",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "e7",
+      "source": "video_branch",
+      "sourceHandle": "video",
+      "target": "video_output",
+      "targetHandle": "video"
+    }
+  ]
+}

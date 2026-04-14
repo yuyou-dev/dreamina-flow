@@ -1,0 +1,74 @@
+import type { FlowEdge, FlowNode } from "./types.js";
+
+function nodeById(nodes: FlowNode[], nodeId: string): FlowNode | undefined {
+  return nodes.find((node) => node.id === nodeId);
+}
+
+export function processorChainForTarget(
+  targetNodeId: string,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  isProcessorNode: (nodeType: string) => boolean,
+): string[][] {
+  const targetNode = nodeById(nodes, targetNodeId);
+  if (!targetNode || !isProcessorNode(targetNode.data.nodeType)) {
+    return [];
+  }
+
+  const relevantNodes = new Set<string>();
+
+  function collect(id: string) {
+    if (relevantNodes.has(id)) {
+      return;
+    }
+    relevantNodes.add(id);
+    const upstream = edges
+      .filter((edge) => edge.target === id)
+      .map((edge) => nodeById(nodes, edge.source))
+      .filter((candidate): candidate is FlowNode => {
+        return !!candidate && isProcessorNode(candidate.data.nodeType);
+      });
+    upstream.forEach((node) => collect(node.id));
+  }
+
+  collect(targetNodeId);
+
+  const inDegree: Record<string, number> = {};
+  const graph: Record<string, string[]> = {};
+
+  for (const id of relevantNodes) {
+    inDegree[id] = 0;
+    graph[id] = [];
+  }
+
+  for (const id of relevantNodes) {
+    const upstream = edges
+      .filter((edge) => edge.target === id)
+      .map((edge) => edge.source)
+      .filter((sourceId) => relevantNodes.has(sourceId));
+
+    for (const depId of upstream) {
+      graph[depId].push(id);
+      inDegree[id] += 1;
+    }
+  }
+
+  const batches: string[][] = [];
+  let currentBatch = Object.keys(inDegree).filter((id) => inDegree[id] === 0);
+
+  while (currentBatch.length > 0) {
+    batches.push(currentBatch);
+    const nextBatch: string[] = [];
+    for (const nodeId of currentBatch) {
+      for (const child of graph[nodeId] || []) {
+        inDegree[child] -= 1;
+        if (inDegree[child] === 0) {
+          nextBatch.push(child);
+        }
+      }
+    }
+    currentBatch = nextBatch;
+  }
+
+  return batches;
+}

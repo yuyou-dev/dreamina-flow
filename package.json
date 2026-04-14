@@ -1,0 +1,27 @@
+{
+  "name": "workflow-studio-oss",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "audit:cli-help": "node ./scripts/audit-cli-help.mjs",
+    "install:all": "npm install",
+    "build:packages": "npm run build --workspace @workflow-studio/workflow-core && npm run build --workspace @workflow-studio/dreamina-adapter",
+    "dev": "npm run build:packages && concurrently -k -n api,web -c cyan,yellow \"npm run dev --workspace @workflow-studio/studio-api\" \"npm run dev --workspace @workflow-studio/studio-web\"",
+    "build": "npm run build --workspace @workflow-studio/workflow-core && npm run build --workspace @workflow-studio/dreamina-adapter && npm run build --workspace @workflow-studio/studio-api && npm run build --workspace @workflow-studio/studio-web",
+    "typecheck": "npm run typecheck --workspace @workflow-studio/workflow-core && npm run typecheck --workspace @workflow-studio/dreamina-adapter && npm run typecheck --workspace @workflow-studio/studio-api && npm run typecheck --workspace @workflow-studio/studio-web",
+    "test": "npm run build:packages && npm run test --workspace @workflow-studio/workflow-core && npm run test --workspace @workflow-studio/dreamina-adapter && npm run test --workspace @workflow-studio/studio-api",
+    "start": "npm run build:packages && concurrently -k -n api,web -c cyan,yellow \"npm run start --workspace @workflow-studio/studio-api\" \"npm run preview --workspace @workflow-studio/studio-web -- --host 0.0.0.0 --port 3000\"",
+    "migrate:schema": "node ./scripts/migrate-workflow-schema.mjs",
+    "ci:verify": "npm run typecheck && npm run test && npm run build && node ./scripts/migrate-workflow-schema.mjs --check && npm run audit:cli-help"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

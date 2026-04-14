@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose an improvement to the neutral workflow system, Dreamina adapter, or example apps.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Primary area
+      options:
+        - workflow-core
+        - dreamina-adapter
+        - studio-api
+        - studio-web
+        - docs / repository tooling
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain point or limitation are you trying to address?
+      placeholder: Describe the real workflow problem first.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or API you want to see.
+      placeholder: Explain the change at a high level.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Share workarounds or other designs you considered.
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract impact
+      description: Mention any schema, API, node-definition, or release-note impact you expect.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, examples, prior art, or workflow JSON snippets.
