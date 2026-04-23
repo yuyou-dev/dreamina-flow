@@ -123,7 +123,7 @@ function AccountStatusCard({
 
   let stateLabel = "需登录";
   let headline = "点击展开账户详情";
-  let detail = "登录、积分和二维码都在这里。";
+  let detail = "登录、积分和设备授权信息都在这里。";
   let badgeClass = "bg-[#ffd9d0] text-[#8a201c]";
   let lampClass = "bg-[#ff5f52]";
 
@@ -140,11 +140,11 @@ function AccountStatusCard({
     badgeClass = "bg-[#fff1b8] text-[#8a5a00]";
     lampClass = "bg-[#ffb703]";
   } else if (isLoginPending) {
-    stateLabel = "待扫码";
+    stateLabel = "待授权";
     headline = pendingResume
-      ? "扫码后会自动继续刚才的操作"
+      ? "授权后会自动继续刚才的操作"
       : "Headless 登录已启动";
-    detail = "打开卡片查看二维码和登录进度。";
+    detail = "打开卡片查看授权地址、user code 和登录进度。";
     badgeClass = "bg-[#fff1b8] text-[#8a5a00]";
     lampClass = "bg-[#ffb703]";
   } else if (isLoggedIn) {

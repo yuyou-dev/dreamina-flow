@@ -39,7 +39,8 @@
 
 - 8 个生成命令都会把可选 `session` 参数透传给 Dreamina CLI
 - 对 CLI 明确支持“留空即走默认值”的模型/分辨率参数，catalog 会保留为空而不是预先填死
-- `list_task`、`session` 管理子命令、`import_login_response` 目前只记录在本地 CLI 对齐文档中，不暴露到 API / UI
+- 登录会话现在走 OAuth Device Flow：先执行 `dreamina login --headless` / `dreamina relogin --headless`，再用 `dreamina login checklogin --device_code=...` 轮询完成授权
+- `list_task`、`session` 管理子命令目前只记录在本地 CLI 对齐文档中，不暴露到 API / UI
 
 ## API
 

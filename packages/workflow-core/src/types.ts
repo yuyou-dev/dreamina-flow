@@ -57,9 +57,9 @@ export interface AdapterStatus {
 }
 
 export interface AdapterCredits {
-  vipCredit: number;
-  giftCredit: number;
-  purchaseCredit: number;
+  vipCredit?: number;
+  giftCredit?: number;
+  purchaseCredit?: number;
   totalCredit: number;
 }
 
@@ -77,7 +77,11 @@ export interface AdapterLoginSession {
   sessionId: string;
   mode: AdapterLoginMode;
   phase: AdapterLoginPhase;
-  qrText: string | null;
+  terminalOutput: string | null;
+  verificationUri: string | null;
+  userCode: string | null;
+  deviceCode?: string | null;
+  qrText?: string | null;
   qrImageDataUrl?: string | null;
   message: string | null;
   startedAt: string;

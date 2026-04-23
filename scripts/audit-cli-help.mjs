@@ -12,15 +12,20 @@ const commands = [
   { name: "text2video", args: ["text2video", "-h"] },
   { name: "frames2video", args: ["frames2video", "-h"] },
   { name: "multiframe2video", args: ["multiframe2video", "-h"] },
+  { name: "image2video", args: ["image2video", "-h"] },
+  { name: "multimodal2video", args: ["multimodal2video", "-h"] },
   { name: "login", args: ["login", "-h"] },
+  { name: "login_checklogin", args: ["login", "checklogin", "-h"] },
   { name: "relogin", args: ["relogin", "-h"] },
-  { name: "import_login_response", args: ["import_login_response", "-h"] },
   { name: "list_task", args: ["list_task", "-h"] },
   { name: "query_result", args: ["query_result", "-h"] },
   { name: "session", args: ["session", "-h"] },
+  { name: "session_create", args: ["session", "create", "-h"] },
+  { name: "session_list", args: ["session", "list", "-h"] },
+  { name: "session_search", args: ["session", "search", "-h"] },
+  { name: "session_rename", args: ["session", "rename", "-h"] },
+  { name: "session_delete", args: ["session", "delete", "-h"] },
   { name: "user_credit", args: ["user_credit", "-h"] },
-  { name: "multimodal2video", args: ["multimodal2video", "-h"] },
-  { name: "image2video", args: ["image2video", "-h"] },
 ];
 
 const outputs = new Map();
@@ -126,15 +131,21 @@ const imageUpscale = outputs.get("image_upscale") || "";
 const text2video = outputs.get("text2video") || "";
 const frames2video = outputs.get("frames2video") || "";
 const multiframe2video = outputs.get("multiframe2video") || "";
+const image2video = outputs.get("image2video") || "";
+const multimodal2video = outputs.get("multimodal2video") || "";
 const login = outputs.get("login") || "";
+const loginChecklogin = outputs.get("login_checklogin") || "";
 const relogin = outputs.get("relogin") || "";
-const importLoginResponse = outputs.get("import_login_response") || "";
 const listTask = outputs.get("list_task") || "";
 const queryResult = outputs.get("query_result") || "";
 const session = outputs.get("session") || "";
+const sessionCreate = outputs.get("session_create") || "";
+const sessionList = outputs.get("session_list") || "";
+const sessionSearch = outputs.get("session_search") || "";
+const sessionRename = outputs.get("session_rename") || "";
+const sessionDelete = outputs.get("session_delete") || "";
 const userCredit = outputs.get("user_credit") || "";
-const multimodal2video = outputs.get("multimodal2video") || "";
-const image2video = outputs.get("image2video") || "";
+
 const generatorCommands = [
   "text2image",
   "image2image",
@@ -146,41 +157,65 @@ const generatorCommands = [
   "multimodal2video",
 ];
 
-assertContains("root", "import_login_response", root, "import_login_response");
+assertContains("root", "OAuth Device Flow", root, "OAuth Device Flow");
+assertContains("root", "verification_uri, user_code, and device_code", root, "device login fields");
+assertContains("root", "dreamina login checklogin --device_code=<device_code> --poll=30", root, "login checklogin example");
 assertContains("root", "list_task", root, "list_task");
 assertContains("root", "query_result", root, "query_result");
 assertContains("root", "session", root, "session");
+assertContains("root", "multimodal2video", root, "multimodal2video");
+assertNotContains("root", "import_login_response", root, "import_login_response");
+
 assertAllContain(generatorCommands, "--session", "--session");
 assertAllContain(generatorCommands, "--poll", "--poll");
+
 assertNotContains("text2image", "lab", text2image, "lab");
+assertContains("text2image", "4.0, 4.1, 4.5, 4.6, 5.0", text2image, "4.x/5.x models");
+assertContains("text2image", "omit --model_version to use the default model", text2image, "default model note");
+
 assertNotContains("image2image", "lab", image2image, "lab");
 assertContains("image2image", "1 to 10", image2image, "1 to 10");
 assertContains("image_upscale", "4k and 8k require VIP", imageUpscale, "4k and 8k require VIP");
+
 assertContains("login", "--headless", login, "--headless");
-assertContains("login", "QR code", login, "QR code");
+assertContains("login", "verification_uri, user_code, and device_code", login, "device login fields");
+assertContains("login", "manual-import login flow are no longer used", login, "manual-import removal");
+assertNotContains("login", "QR code", login, "QR code");
+
+assertContains("login_checklogin", "--device_code", loginChecklogin, "--device_code");
+assertContains("login_checklogin", "--poll", loginChecklogin, "--poll");
+assertContains("login_checklogin", "--poll=0 checks only once", loginChecklogin, "--poll=0");
+
 assertContains("relogin", "--headless", relogin, "--headless");
-assertContains("relogin", "QR code", relogin, "QR code");
-assertContains("import_login_response", "--file", importLoginResponse, "--file");
-assertContains("import_login_response", "stdin", importLoginResponse, "stdin");
+assertContains("relogin", "verification_uri, user_code, and device_code", relogin, "device login fields");
+assertNotContains("relogin", "QR code", relogin, "QR code");
+
 assertContains("list_task", "--gen_status", listTask, "--gen_status");
-assertContains("list_task", "--limit", listTask, "--limit");
+assertContains("list_task", "--gen_task_type", listTask, "--gen_task_type");
+assertContains("list_task", "--offset", listTask, "--offset");
+assertContains("list_task", "--submit_id", listTask, "--submit_id");
+
 assertContains("query_result", "--download_dir", queryResult, "--download_dir");
+
 assertContains("session", "create", session, "create");
 assertContains("session", "list", session, "list");
 assertContains("session", "search", session, "search");
 assertContains("session", "rename", session, "rename");
 assertContains("session", "delete", session, "delete");
-assertContains("session", "--session=<id>", session, "--session=<id>");
+assertContains("session", "Session 0 is the default session", session, "Session 0");
+assertContains("session_create", "新对话", sessionCreate, "新对话");
+assertContains("session_list", "ID, NAME, PINNED, UPDATED_AT", sessionList, "session table columns");
+assertContains("session_search", "case-sensitive", sessionSearch, "case-sensitive");
+assertContains("session_rename", "cannot be renamed", sessionRename, "cannot be renamed");
+assertContains("session_delete", "soft delete", sessionDelete, "soft delete");
+
 assertContains("user_credit", "remaining Dreamina credits", userCredit, "remaining Dreamina credits");
-assertContains("text2video", "default: seedance2.0fast", text2video, "default: seedance2.0fast");
-assertContains("frames2video", "default model_version: seedance2.0fast", frames2video, "default model_version: seedance2.0fast");
+assertContains("text2video", "seedance2.0fast", text2video, "seedance2.0fast");
+assertContains("frames2video", "seedance2.0fast", frames2video, "seedance2.0fast");
 assertContains("multiframe2video", "default each segment to 3", multiframe2video, "default each segment to 3");
-assertContains(
-  "root/multimodal2video",
-  "全能参考 / formerly ref2video",
-  `${root}\n${multimodal2video}`,
-  "全能参考 / formerly ref2video",
-);
+assertContains("multimodal2video", "formerly known as ref2video", multimodal2video, "formerly known as ref2video");
+assertContains("multimodal2video", "image<=9, video<=3, audio<=3", multimodal2video, "input limits");
+assertContains("image2video", "advanced controls", image2video, "advanced controls");
 assertContains("image2video", "3.0_fast", image2video, "3.0_fast");
 assertContains("image2video", "3.0_pro", image2video, "3.0_pro");
 assertContains("image2video", "3.5_pro", image2video, "3.5_pro");

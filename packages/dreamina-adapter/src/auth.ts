@@ -2,34 +2,54 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type {
   AdapterAuthStatus,
-  AdapterCredits,
   AdapterLoginMode,
   AdapterLoginSession,
 } from "@workflow-studio/workflow-core";
 import { REPO_ROOT } from "./runtime.js";
 import {
-  createInteractiveSession,
   normalizeTerminalOutput,
   runCli,
-  type InteractiveSession,
   type RunCliResult,
 } from "./cli.js";
 
 const DEFAULT_DREAMINA_BIN = process.env.DREAMINA_BIN ?? process.env.DREAMINA_CLI ?? "dreamina";
-const LOGIN_MESSAGE = "Waiting for Dreamina headless login to complete.";
+const LOGIN_MESSAGE = "Waiting for Dreamina OAuth device authorization to complete.";
+const LOGIN_PENDING_MESSAGE = "Open the verification URL, enter the user code, and keep this panel open while Dreamina checks login status.";
 const LOGIN_COMPLETED_MESSAGE = "Dreamina login completed.";
 const LOGIN_SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const AUTH_REFRESH_THROTTLE_MS = 1000;
-const LOGIN_SESSION_TIMEOUT_MESSAGE = "Dreamina login session timed out. Please start another headless login session.";
+const CHECKLOGIN_THROTTLE_MS = 1000;
+const LOGIN_SESSION_TIMEOUT_MESSAGE = "Dreamina OAuth login session timed out. Please start another device login session.";
 const QR_READY_PATTERN = /^\[DREAMINA:QR_READY\]\s+(.+)$/m;
+const VERIFICATION_URI_PATTERNS = [
+  /^\s*verification_uri\s*[:=]\s*(\S+)\s*$/im,
+  /^\s*verification uri\s*[:=]\s*(\S+)\s*$/im,
+];
+const USER_CODE_PATTERNS = [
+  /^\s*user_code\s*[:=]\s*([A-Z0-9-]+)\s*$/im,
+  /^\s*user code\s*[:=]\s*([A-Z0-9-]+)\s*$/im,
+];
+const DEVICE_CODE_PATTERNS = [
+  /^\s*device_code\s*[:=]\s*(\S+)\s*$/im,
+  /^\s*device code\s*[:=]\s*(\S+)\s*$/im,
+];
+const FATAL_CHECKLOGIN_PATTERNS = [
+  "expired_token",
+  "access_denied",
+  "invalid device code",
+  "invalid_device_code",
+  "device code expired",
+];
 
 type LoginSessionState = AdapterLoginSession & {
   output: string;
-  process: InteractiveSession | null;
   qrImagePath: string | null;
   lastAuthRefreshAtMs: number | null;
   authRefreshInFlight: Promise<AdapterAuthStatus> | null;
   deadlineAtMs: number;
+  lastCheckloginAtMs: number | null;
+  checkloginInFlight: Promise<RunCliResult> | null;
+  authorizationCompletedAtMs: number | null;
 };
 
 export interface DreaminaAuthServiceDependencies {
@@ -37,7 +57,6 @@ export interface DreaminaAuthServiceDependencies {
   now?: () => Date;
   randomId?: () => string;
   runCli?: typeof runCli;
-  createInteractiveSession?: typeof createInteractiveSession;
 }
 
 export interface DreaminaAuthService {
@@ -48,9 +67,9 @@ export interface DreaminaAuthService {
 }
 
 type CreditsPayload = {
-  vipCredit: number;
-  giftCredit: number;
-  purchaseCredit: number;
+  vipCredit?: number;
+  giftCredit?: number;
+  purchaseCredit?: number;
   totalCredit: number;
 };
 
@@ -67,7 +86,11 @@ function toSessionSnapshot(session: LoginSessionState): AdapterLoginSession {
     sessionId: session.sessionId,
     mode: session.mode,
     phase: session.phase,
-    qrText: session.qrText,
+    terminalOutput: session.terminalOutput,
+    verificationUri: session.verificationUri,
+    userCode: session.userCode,
+    deviceCode: session.deviceCode ?? null,
+    qrText: session.qrText ?? null,
     qrImageDataUrl: session.qrImageDataUrl ?? null,
     message: session.message,
     startedAt: session.startedAt,
@@ -95,19 +118,14 @@ function parseCreditsPayload(payload: unknown): CreditsPayload | null {
   const purchaseCredit = candidate.purchaseCredit ?? candidate.purchase_credit;
   const totalCredit = candidate.totalCredit ?? candidate.total_credit;
 
-  if (
-    typeof vipCredit !== "number"
-    || typeof giftCredit !== "number"
-    || typeof purchaseCredit !== "number"
-    || typeof totalCredit !== "number"
-  ) {
+  if (typeof totalCredit !== "number") {
     return null;
   }
 
   return {
-    vipCredit,
-    giftCredit,
-    purchaseCredit,
+    vipCredit: typeof vipCredit === "number" ? vipCredit : undefined,
+    giftCredit: typeof giftCredit === "number" ? giftCredit : undefined,
+    purchaseCredit: typeof purchaseCredit === "number" ? purchaseCredit : undefined,
     totalCredit,
   };
 }
@@ -146,10 +164,6 @@ function parseUserCreditOutput(result: RunCliResult, timestamp: string): Adapter
   }
 }
 
-function combineSessionOutput(session: LoginSessionState): string {
-  return session.output;
-}
-
 function extractQrImagePath(output: string): string | null {
   const match = output.match(QR_READY_PATTERN);
   const rawPath = match?.[1]?.trim();
@@ -160,9 +174,61 @@ function toPngDataUrl(buffer: Buffer): string {
   return `data:image/png;base64,${buffer.toString("base64")}`;
 }
 
-function updateSessionQrArtifacts(session: LoginSessionState): void {
-  const output = normalizeTerminalOutput(combineSessionOutput(session));
-  session.qrText = output.trim().length > 0 ? output : null;
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function readStringValue(candidate: Record<string, unknown> | null, keys: string[]): string | null {
+  if (!candidate) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = candidate[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function readPatternValue(text: string, patterns: RegExp[]): string | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const value = match?.[1]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function updateSessionArtifacts(session: LoginSessionState): void {
+  const output = normalizeTerminalOutput(session.output);
+  const parsed = parseJsonObject(output);
+  session.terminalOutput = output.trim().length > 0 ? output : null;
+  session.qrText = session.terminalOutput;
+  session.verificationUri = readStringValue(parsed, ["verification_uri", "verificationUri"])
+    ?? readPatternValue(output, VERIFICATION_URI_PATTERNS);
+  session.userCode = readStringValue(parsed, ["user_code", "userCode"])
+    ?? readPatternValue(output, USER_CODE_PATTERNS);
+  session.deviceCode = readStringValue(parsed, ["device_code", "deviceCode"])
+    ?? readPatternValue(output, DEVICE_CODE_PATTERNS);
 
   const qrImagePath = extractQrImagePath(output);
   if (!qrImagePath) {
@@ -182,6 +248,47 @@ function updateSessionQrArtifacts(session: LoginSessionState): void {
   }
 }
 
+function appendSessionOutput(session: LoginSessionState, text: string): void {
+  const normalized = normalizeTerminalOutput(text).trim();
+  if (!normalized) {
+    return;
+  }
+
+  const current = normalizeTerminalOutput(session.output).trim();
+  if (current === normalized || current.endsWith(`\n${normalized}`)) {
+    updateSessionArtifacts(session);
+    return;
+  }
+
+  session.output = [current, normalized].filter(Boolean).join("\n");
+  updateSessionArtifacts(session);
+}
+
+function hasAuthMaterial(session: LoginSessionState): boolean {
+  return Boolean(session.deviceCode || session.userCode || session.verificationUri || session.qrImageDataUrl);
+}
+
+function checkloginText(result: RunCliResult): string {
+  return normalizeTerminalOutput([result.stdout, result.stderr].filter(Boolean).join("\n")).trim().toLowerCase();
+}
+
+function isRecoverableCheckloginResult(result: RunCliResult): boolean {
+  const text = checkloginText(result);
+  if (text && FATAL_CHECKLOGIN_PATTERNS.some((pattern) => text.includes(pattern))) {
+    return false;
+  }
+
+  if (result.ok) {
+    return false;
+  }
+
+  if (!text) {
+    return true;
+  }
+
+  return true;
+}
+
 function finalizeSession(
   session: LoginSessionState,
   phase: AdapterLoginSession["phase"],
@@ -191,8 +298,7 @@ function finalizeSession(
   session.phase = phase;
   session.message = message;
   session.finishedAt = nowIso(now);
-  session.process = null;
-  updateSessionQrArtifacts(session);
+  updateSessionArtifacts(session);
 }
 
 function createSessionState(mode: AdapterLoginMode, now: () => Date, randomId: () => string): LoginSessionState {
@@ -201,17 +307,23 @@ function createSessionState(mode: AdapterLoginMode, now: () => Date, randomId: (
     sessionId: randomId(),
     mode,
     phase: "pending",
+    terminalOutput: null,
+    verificationUri: null,
+    userCode: null,
+    deviceCode: null,
     qrText: null,
     qrImageDataUrl: null,
     message: LOGIN_MESSAGE,
     startedAt: startedAt.toISOString(),
     finishedAt: null,
     output: "",
-    process: null,
     qrImagePath: null,
     lastAuthRefreshAtMs: null,
     authRefreshInFlight: null,
     deadlineAtMs: startedAt.getTime() + LOGIN_SESSION_TIMEOUT_MS,
+    lastCheckloginAtMs: null,
+    checkloginInFlight: null,
+    authorizationCompletedAtMs: null,
   };
 }
 
@@ -220,10 +332,8 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
   const now = deps.now ?? (() => new Date());
   const randomId = deps.randomId ?? defaultRandomId;
   const runCliFn = deps.runCli ?? runCli;
-  const createSessionFn = deps.createInteractiveSession ?? createInteractiveSession;
   const loginSessions = new Map<string, LoginSessionState>();
   let resolvedCliBinPromise: Promise<string> | null = null;
-
   let authCache: AdapterAuthStatus | null = null;
 
   async function resolveCliBin(): Promise<string> {
@@ -251,7 +361,7 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     const timestamp = nowIso(now);
     try {
       const resolvedCliBin = await resolveCliBin();
-      const result = await runCliFn(resolvedCliBin, ["user_credit"]);
+      const result = await runCliFn(resolvedCliBin, ["user_credit"], undefined, REPO_ROOT);
       authCache = parseUserCreditOutput(result, timestamp);
     } catch (error) {
       authCache = createEmptyAuthStatus(timestamp, error instanceof Error ? error.message : String(error));
@@ -277,10 +387,7 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     return null;
   }
 
-  function finalizePendingSession(session: LoginSessionState, phase: AdapterLoginSession["phase"], message: string, process: InteractiveSession | null): void {
-    if (process) {
-      process.kill();
-    }
+  function finalizePendingSession(session: LoginSessionState, phase: AdapterLoginSession["phase"], message: string): void {
     finalizeSession(session, phase, message, now);
   }
 
@@ -302,6 +409,39 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     }
   }
 
+  async function runChecklogin(session: LoginSessionState): Promise<RunCliResult | null> {
+    if (!session.deviceCode) {
+      return null;
+    }
+
+    if (session.checkloginInFlight) {
+      return session.checkloginInFlight;
+    }
+
+    const runPromise = (async () => {
+      const resolvedCliBin = await resolveCliBin();
+      const result = await runCliFn(
+        resolvedCliBin,
+        ["login", "checklogin", `--device_code=${session.deviceCode}`, "--poll=0"],
+        undefined,
+        REPO_ROOT,
+      );
+      appendSessionOutput(session, [result.stdout, result.stderr].filter(Boolean).join("\n"));
+      return result;
+    })();
+
+    session.checkloginInFlight = runPromise;
+    try {
+      const result = await runPromise;
+      session.lastCheckloginAtMs = now().getTime();
+      return result;
+    } finally {
+      if (session.checkloginInFlight === runPromise) {
+        session.checkloginInFlight = null;
+      }
+    }
+  }
+
   async function sweepPendingSessions(auth: AdapterAuthStatus): Promise<void> {
     if (!auth.loggedIn) {
       return;
@@ -311,7 +451,7 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
       if (session.phase !== "pending") {
         continue;
       }
-      finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE, session.process);
+      finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE);
     }
   }
 
@@ -320,11 +460,53 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
       return;
     }
 
-    updateSessionQrArtifacts(session);
+    updateSessionArtifacts(session);
 
     const currentTime = now().getTime();
     if (currentTime >= session.deadlineAtMs) {
-      finalizePendingSession(session, "fail", LOGIN_SESSION_TIMEOUT_MESSAGE, session.process);
+      finalizePendingSession(session, "fail", LOGIN_SESSION_TIMEOUT_MESSAGE);
+      return;
+    }
+
+    if (session.deviceCode) {
+      const shouldChecklogin =
+        session.lastCheckloginAtMs === null
+        || currentTime - session.lastCheckloginAtMs >= CHECKLOGIN_THROTTLE_MS;
+
+      if (!shouldChecklogin) {
+        return;
+      }
+
+      const checkloginResult = await runChecklogin(session);
+      if (session.phase !== "pending") {
+        return;
+      }
+
+      const auth = await refreshPendingSessionAuth(session);
+      if (session.phase !== "pending") {
+        return;
+      }
+
+      if (auth.loggedIn) {
+        finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE);
+        return;
+      }
+
+      if (checkloginResult?.ok) {
+        session.authorizationCompletedAtMs = now().getTime();
+        session.message = "Authorization completed. Waiting for Dreamina to refresh the local login state.";
+        return;
+      }
+
+      if (checkloginResult && !checkloginResult.ok && !isRecoverableCheckloginResult(checkloginResult)) {
+        const output = normalizeTerminalOutput([checkloginResult.stdout, checkloginResult.stderr].filter(Boolean).join("\n")).trim();
+        finalizePendingSession(session, "fail", output || "Dreamina login check failed.");
+        return;
+      }
+
+      session.message = session.authorizationCompletedAtMs !== null
+        ? "Authorization completed. Waiting for Dreamina to refresh the local login state."
+        : LOGIN_PENDING_MESSAGE;
       return;
     }
 
@@ -332,14 +514,16 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
       session.lastAuthRefreshAtMs === null
       || currentTime - session.lastAuthRefreshAtMs >= AUTH_REFRESH_THROTTLE_MS;
 
-    if (shouldRefreshAuth) {
-      const auth = await refreshPendingSessionAuth(session);
-      if (session.phase !== "pending") {
-        return;
-      }
-      if (auth.loggedIn) {
-        finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE, session.process);
-      }
+    if (!shouldRefreshAuth) {
+      return;
+    }
+
+    const auth = await refreshPendingSessionAuth(session);
+    if (session.phase !== "pending") {
+      return;
+    }
+    if (auth.loggedIn) {
+      finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE);
     }
   }
 
@@ -349,7 +533,7 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
         continue;
       }
 
-      finalizePendingSession(session, "fail", message, session.process);
+      finalizePendingSession(session, "fail", message);
     }
   }
 
@@ -362,38 +546,39 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     if (session.phase === "pending") {
       await reconcilePendingSession(session);
     }
-    updateSessionQrArtifacts(session);
+    updateSessionArtifacts(session);
     return toSessionSnapshot(session);
   }
 
   async function startLoginSession(mode: AdapterLoginMode): Promise<AdapterLoginSession> {
-    if (mode === "login") {
-      // Avoid forcing a fresh `user_credit` probe right before `login --headless`.
-      // In practice, the Dreamina CLI can fail to emit the QR session after that probe,
-      // so only trust the cached auth snapshot if we already have one.
-      if (authCache?.loggedIn) {
-        const startedAtDate = now();
-        const startedAt = startedAtDate.toISOString();
-        const startedAtMs = startedAtDate.getTime();
-        const session: LoginSessionState = {
-          sessionId: randomId(),
-          mode,
-          phase: "success",
-          qrText: null,
-          qrImageDataUrl: null,
-          message: "Dreamina is already logged in.",
-          startedAt,
-          finishedAt: startedAt,
-          output: "",
-          process: null,
-          qrImagePath: null,
-          lastAuthRefreshAtMs: null,
-          authRefreshInFlight: null,
-          deadlineAtMs: startedAtMs + LOGIN_SESSION_TIMEOUT_MS,
-        };
-        registerSession(session);
-        return toSessionSnapshot(session);
-      }
+    if (mode === "login" && authCache?.loggedIn) {
+      const startedAtDate = now();
+      const startedAt = startedAtDate.toISOString();
+      const startedAtMs = startedAtDate.getTime();
+      const session: LoginSessionState = {
+        sessionId: randomId(),
+        mode,
+        phase: "success",
+        terminalOutput: null,
+        verificationUri: null,
+        userCode: null,
+        deviceCode: null,
+        qrText: null,
+        qrImageDataUrl: null,
+        message: "Dreamina is already logged in.",
+        startedAt,
+        finishedAt: startedAt,
+        output: "",
+        qrImagePath: null,
+        lastAuthRefreshAtMs: null,
+        authRefreshInFlight: null,
+        deadlineAtMs: startedAtMs + LOGIN_SESSION_TIMEOUT_MS,
+        lastCheckloginAtMs: null,
+        checkloginInFlight: null,
+        authorizationCompletedAtMs: null,
+      };
+      registerSession(session);
+      return toSessionSnapshot(session);
     }
 
     const existingPendingSession = await activePendingSession();
@@ -405,41 +590,30 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
     registerSession(session);
 
     try {
-      // Interactive headless login is more reliable when launched with the configured
-      // command name instead of the `which`-resolved absolute path.
-      const interactiveCliBin = cliBin;
-      const sessionProcess = createSessionFn(interactiveCliBin, [mode, "--headless"], {
-        cwd: REPO_ROOT,
-        env: process.env,
-        cols: 100,
-        rows: 36,
-      });
+      const result = await runCliFn(cliBin, [mode, "--headless"], undefined, REPO_ROOT);
+      appendSessionOutput(session, [result.stdout, result.stderr].filter(Boolean).join("\n"));
 
-      session.process = sessionProcess;
-      sessionProcess.onData((chunk) => {
-        session.output += chunk;
-        updateSessionQrArtifacts(session);
-      });
-      sessionProcess.onExit(({ exitCode }) => {
-        void (async () => {
-          if (session.phase !== "pending") {
-            return;
-          }
+      if (hasAuthMaterial(session)) {
+        if (!session.deviceCode) {
+          finalizePendingSession(
+            session,
+            "fail",
+            "Dreamina headless login output is missing device_code, so automatic checklogin cannot continue.",
+          );
+        } else {
+          session.message = LOGIN_PENDING_MESSAGE;
+        }
+        return toSessionSnapshot(session);
+      }
 
-          const auth = await getAuthStatus(true);
-          if (session.phase !== "pending") {
-            return;
-          }
+      const auth = await getAuthStatus(true);
+      if (auth.loggedIn) {
+        finalizeSession(session, "success", "Dreamina is already logged in.", now);
+        return toSessionSnapshot(session);
+      }
 
-          if (auth.loggedIn) {
-            finalizePendingSession(session, "success", LOGIN_COMPLETED_MESSAGE, session.process);
-            return;
-          }
-
-          const output = normalizeTerminalOutput(combineSessionOutput(session)).trim();
-          finalizePendingSession(session, "fail", output || `Dreamina ${mode} --headless exited with code ${exitCode}.`, session.process);
-        })();
-      });
+      const output = normalizeTerminalOutput([result.stdout, result.stderr].filter(Boolean).join("\n")).trim();
+      finalizeSession(session, "fail", output || `Dreamina ${mode} --headless did not return OAuth login material.`, now);
     } catch (error) {
       finalizeSession(session, "fail", error instanceof Error ? error.message : String(error), now);
     }
@@ -463,7 +637,7 @@ function createDreaminaAuthRuntime(deps: DreaminaAuthServiceDependencies = {}) {
 
     try {
       const resolvedCliBin = await resolveCliBin();
-      const result = await runCliFn(resolvedCliBin, ["logout"]);
+      const result = await runCliFn(resolvedCliBin, ["logout"], undefined, REPO_ROOT);
       const combined = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
       message = combined || (result.ok ? "Dreamina logout completed." : "Dreamina logout failed.");
     } catch (error) {
@@ -518,5 +692,3 @@ export async function getDreaminaLoginSession(sessionId: string): Promise<Adapte
 export async function logoutDreamina(): Promise<AdapterAuthStatus> {
   return defaultDreaminaAuthRuntime.logout();
 }
-
-export { normalizeTerminalOutput, parseCreditsPayload as parseDreaminaCreditsPayload, parseUserCreditOutput as parseDreaminaUserCreditOutput };

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircle2, LoaderCircle, LogOut, QrCode, RefreshCw, ShieldAlert, X } from "lucide-react";
+import { CheckCircle2, KeyRound, LoaderCircle, LogOut, RefreshCw, ShieldAlert, X } from "lucide-react";
 import logoStatic from "../../assets/brand/logo-static.png";
 import type { SystemStatusIntent } from "../../hooks/useSystemStatus";
 import type {
@@ -137,7 +137,9 @@ export function SystemStatusModal({
   const isSessionFailed = !effectiveLoginSucceeded && loginSession?.phase === "fail";
   const hasBlockedAction = Boolean(pendingResumeAction);
   const primaryLoginMode: AdapterLoginMode = effectiveLoginSucceeded ? "relogin" : "login";
-  const showQrPanel = !effectiveLoginSucceeded;
+  const showLoginPanel = !effectiveLoginSucceeded;
+  const showLegacyQr = Boolean(loginSession?.qrImageDataUrl);
+  const hasDeviceFlowDetails = Boolean(loginSession?.verificationUri || loginSession?.userCode || loginSession?.deviceCode);
   const sessionLabel = isLoggedIn
     ? "auth · logged in"
     : loginSession
@@ -145,7 +147,7 @@ export function SystemStatusModal({
       : "No active session";
   const sessionMessage = effectiveLoginSucceeded
     ? runtimeStatus?.auth.message ?? loginSession?.message ?? "Dreamina login completed."
-    : loginSession?.message ?? runtimeStatus?.auth.message ?? "Start Dreamina headless login to render the QR block here.";
+    : loginSession?.message ?? runtimeStatus?.auth.message ?? "Start Dreamina headless login to render the device authorization details here.";
 
   let tone: Tone = "danger";
   if (!isCliReady) {
@@ -158,7 +160,7 @@ export function SystemStatusModal({
 
   let stageLabel = "Login Required";
   let stageTitle = "Dreamina login is required";
-  let stageDescription = "Start a headless login session, scan the QR code, and this panel will refresh the account details.";
+  let stageDescription = "Start a headless login session, open the verification URL, and enter the user code to finish OAuth Device Flow.";
 
   if (!isCliReady) {
     stageLabel = "CLI Missing";
@@ -175,17 +177,17 @@ export function SystemStatusModal({
     stageTitle = "Login succeeded, refreshing account details";
     stageDescription = "Dreamina accepted the login. Waiting for the runtime snapshot and credits to refresh.";
   } else if (isSessionPending) {
-    stageLabel = "Waiting for Scan";
-    stageTitle = "Scan the Dreamina headless login QR code";
-    stageDescription = "Keep this panel open while Dreamina waits for the QR scan.";
+    stageLabel = "Waiting for Authorization";
+    stageTitle = "Complete Dreamina OAuth Device Flow";
+    stageDescription = "Open the verification URL, enter the user code, and keep this panel open while the runtime checks login status.";
   } else if (statusIntent === "authRequired" && pendingResumeAction) {
     stageLabel = "Login Required";
     stageTitle = `${actionLabel(pendingResumeAction)} is blocked until you log in`;
-    stageDescription = "Open a headless login session from this panel, scan the QR code, and the canvas will continue the blocked action once.";
+    stageDescription = "Open a headless login session from this panel, finish OAuth Device Flow, and the canvas will continue the blocked action once.";
   } else if (isSessionFailed) {
     stageLabel = "Login Failed";
     stageTitle = "The last headless login attempt did not complete";
-    stageDescription = "Review the QR output below and try starting another headless login session.";
+    stageDescription = "Review the device authorization output below and try starting another headless login session.";
   }
 
   const toneClasses = toneClassMap[tone];
@@ -203,7 +205,7 @@ export function SystemStatusModal({
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-500">Account Status</div>
               <div className="mt-1 text-[24px] font-black leading-none">歪比巴布Workflow Studio</div>
               <div className="mt-2 text-[11px] font-medium leading-5 text-gray-700">
-                Login, credits, CLI status, and the headless Dreamina QR flow all live in one place.
+                Login, credits, CLI status, and the headless Dreamina OAuth flow all live in one place.
               </div>
             </div>
           </div>
@@ -216,7 +218,7 @@ export function SystemStatusModal({
           </button>
         </div>
 
-        <div className={`grid gap-5 px-4 py-4 sm:px-5 sm:py-5 ${showQrPanel ? "lg:grid-cols-[1.08fr_0.92fr]" : ""}`}>
+        <div className={`grid gap-5 px-4 py-4 sm:px-5 sm:py-5 ${showLoginPanel ? "lg:grid-cols-[1.08fr_0.92fr]" : ""}`}>
           <div className="flex flex-col gap-4">
             <div className={`rounded-[26px] border-[3px] border-black p-5 ${toneClasses.hero}`}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -324,51 +326,89 @@ export function SystemStatusModal({
             </div>
           </div>
 
-          {showQrPanel ? (
+          {showLoginPanel ? (
             <div className="flex min-w-0 flex-col gap-4">
               <div className="min-w-0 rounded-[24px] border-[3px] border-black bg-[#f5f3ea] p-4 text-gray-900">
                 <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-gray-500">
-                  <QrCode size={14} />
-                  Headless Login QR
+                  <KeyRound size={14} />
+                  OAuth Device Login
                 </div>
                 <div className="min-w-0 space-y-3">
-                  <div className="flex h-[320px] items-center justify-center rounded-[18px] border-[2px] border-black bg-white p-4">
-                    <div className="flex h-[280px] w-[280px] max-h-full max-w-full items-center justify-center overflow-hidden rounded-[18px] border-[2px] border-black/10 bg-white p-4">
+                  <div className="rounded-[18px] border-[2px] border-black bg-white p-4">
+                    <div className="space-y-3">
                       {!isCliReady ? (
-                        <div className="max-w-[220px] text-center text-[12px] font-medium leading-6 text-gray-700">
+                        <div className="text-center text-[12px] font-medium leading-6 text-gray-700">
                           请先安装 Dreamina CLI，再从这里发起登录。
                         </div>
                       ) : isSessionPending || isStartingLogin ? (
-                        loginSession?.qrImageDataUrl ? (
-                          <img
-                            src={loginSession.qrImageDataUrl}
-                            alt="Dreamina headless login QR code"
-                            className="h-full w-full rounded-[14px] bg-white object-contain"
-                          />
+                        hasDeviceFlowDetails ? (
+                          <div className="space-y-3">
+                            <div className="rounded-[16px] border-[2px] border-black bg-[#fff9db] px-4 py-3">
+                              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500">Verification URL</div>
+                              <div className="mt-2 break-all text-[12px] font-medium leading-5 text-gray-700">
+                                {loginSession?.verificationUri ? (
+                                  <a
+                                    href={loginSession.verificationUri}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="underline decoration-[2px] underline-offset-2"
+                                  >
+                                    {loginSession.verificationUri}
+                                  </a>
+                                ) : (
+                                  "Waiting for Dreamina to print verification_uri."
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="rounded-[16px] border-[2px] border-black bg-[#f8f5ef] px-4 py-3">
+                                <div className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500">User Code</div>
+                                <div className="mt-2 break-all font-mono text-[20px] font-black tracking-[0.12em]">
+                                  {loginSession?.userCode ?? "--"}
+                                </div>
+                              </div>
+                              <div className="rounded-[16px] border-[2px] border-black bg-[#f8f5ef] px-4 py-3">
+                                <div className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500">Device Code</div>
+                                <div className="mt-2 break-all font-mono text-[11px] font-medium leading-5 text-gray-700">
+                                  {loginSession?.deviceCode ?? "Waiting for Dreamina to print device_code."}
+                                </div>
+                              </div>
+                            </div>
+                            {showLegacyQr ? (
+                              <div className="rounded-[16px] border-[2px] border-dashed border-black bg-[#fffdfa] p-4">
+                                <div className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500">Legacy QR Fallback</div>
+                                <img
+                                  src={loginSession?.qrImageDataUrl ?? undefined}
+                                  alt="Dreamina login QR fallback"
+                                  className="mt-3 max-h-[220px] w-full rounded-[12px] bg-white object-contain"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         ) : (
-                          <div className="flex max-w-[220px] flex-col items-center gap-3 text-center text-[12px] font-medium leading-6 text-gray-700">
+                          <div className="flex flex-col items-center gap-3 text-center text-[12px] font-medium leading-6 text-gray-700">
                             <LoaderCircle size={18} className="animate-spin" />
-                            <span>正在启动登录，二维码会自动显示在这里。</span>
+                            <span>正在启动登录，授权地址和 user code 会自动显示在这里。</span>
                           </div>
                         )
                       ) : isRefreshingAccount ? (
-                        <div className="flex max-w-[220px] flex-col items-center gap-3 text-center text-[12px] font-medium leading-6 text-gray-700">
+                        <div className="flex flex-col items-center gap-3 text-center text-[12px] font-medium leading-6 text-gray-700">
                           <LoaderCircle size={18} className="animate-spin" />
-                          <span>Dreamina accepted the scan. Waiting for the runtime status to refresh.</span>
+                          <span>Dreamina accepted the authorization. Waiting for the runtime status to refresh.</span>
                         </div>
                       ) : (
-                        <div className="flex max-w-[220px] flex-col items-center gap-4 text-center">
+                        <div className="flex flex-col items-center gap-4 text-center">
                           <button
                             type="button"
                             disabled={isLoggingOut || isResumingAction}
                             onClick={() => void onStartLogin(primaryLoginMode)}
                             className="flex w-full items-center justify-center gap-2 rounded-[18px] border-[2px] border-black bg-[#ffe36c] px-4 py-3 text-[14px] font-black text-black shadow-[2px_3px_0px_0px_rgba(0,0,0,1)] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
                           >
-                            <QrCode size={16} />
-                            点击登录
+                            <KeyRound size={16} />
+                            开始设备登录
                           </button>
                           <div className="text-[12px] font-medium leading-6 text-gray-700">
-                            点击后二维码会固定显示在这个区域内，不会再撑开弹层布局。
+                            点击后会在这里显示 verification URL、user code 和终端输出。
                           </div>
                         </div>
                       )}
@@ -377,7 +417,7 @@ export function SystemStatusModal({
                   <pre
                     className="h-[180px] min-w-0 overflow-x-hidden overflow-y-auto rounded-[18px] border-[2px] border-black bg-[#fffdfa] p-4 font-mono text-[11px] leading-4 whitespace-pre-wrap break-words text-[#5f5246] [overflow-wrap:anywhere]"
                   >
-                    {loginSession?.qrText
+                    {loginSession?.terminalOutput
                       ?? loginSession?.message
                       ?? runtimeStatus?.auth.message
                       ?? "Terminal output will appear here after the headless login session starts."}

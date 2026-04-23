@@ -25,7 +25,6 @@
 - `macOS`
 - `Node.js 20+`
 - `npm 10+`
-- `Google Chrome`
 - 本地可用的 `python3`
 
 ## 安装 Dreamina CLI
@@ -49,8 +48,8 @@ dreamina user_credit
 
 说明：
 
-- `dreamina login --headless` 依赖本机已安装 `Google Chrome`
-- 如果浏览器登录是在另一台机器或另一个终端里完成的，可用 `dreamina import_login_response --file <json>` 手动把登录 JSON 导回本机 CLI
+- 新版 `dreamina login --headless` / `dreamina relogin --headless` 会打印 `verification_uri`、`user_code` 和 `device_code`
+- 如果你想在终端里手动确认登录进度，可执行 `dreamina login checklogin --device_code=<device_code> --poll=30`
 - 如果命令无法执行，请先确认 Dreamina CLI 已经加入 `PATH`
 
 ![System Status](docs/screenshots/system-status.png)
@@ -79,7 +78,7 @@ npm run dev
 1. 打开 `http://127.0.0.1:3000`
 2. 进入默认的 starter canvas
 3. 查看左上角账户状态卡，确认 Dreamina CLI 是否可用
-4. 如果需要登录，点击状态卡并发起 headless 登录
+4. 如果需要登录，点击状态卡并发起 headless 设备登录
 5. 在画布中修改 starter workflow 的 prompt，或导入示例 workflow
 6. 点击节点上的 `Run Node`，或点击链路上的 `Run Chain`
 7. 等待结果回写到输出节点
@@ -103,7 +102,8 @@ npm run dev
 - 所有生成节点现在都暴露可选的 `session` 参数；留空时由 Dreamina CLI 使用默认 session `0`
 - 对于新版 CLI 明确支持“省略并走默认值”的字段，Studio 不再强行写死参数
 - `image2video` 留空 `model_version` 时走基础路径；只有填写 `model_version` / `duration` / `video_resolution` 时才进入 advanced controls
-- 当前 UI / API 仍未直接暴露 `list_task`、`session create/list/search/rename/delete`、`import_login_response`；这些仍然是 CLI-first 能力
+- 登录流已切到 OAuth Device Flow：Studio 会读取 `verification_uri` / `user_code` / `device_code`，并在后台自动轮询 `dreamina login checklogin`
+- 当前 UI / API 仍未直接暴露 `list_task`、`session create/list/search/rename/delete`；这些仍然是 CLI-first 能力
 
 ## 验证命令
 
@@ -121,8 +121,8 @@ npm run audit:cli-help
 
 - `npm run dev` 依赖 `3000` 和 `3100` 两个默认端口；如果端口被占用，请先释放再启动
 - 这个仓库当前的定位是开源源码仓库，不包含远程部署、账号托管或云端服务
-- 登录、积分、二维码和运行状态都通过本地 Dreamina CLI 驱动
-- 登录 UI 当前优先覆盖 headless QR 流；`import_login_response` 手动导入 JSON 兜底流程只在 CLI 中提供
+- 登录、积分、设备授权信息和运行状态都通过本地 Dreamina CLI 驱动
+- 登录 UI 当前优先覆盖 headless OAuth Device Flow；如果 CLI 仍输出旧 QR 标记，UI 会把它当成兼容兜底信息显示
 - 更多实现细节可参考 [docs/technical-overview.md](docs/technical-overview.md) 和 [docs/workflow-json-format.md](docs/workflow-json-format.md)
 - 贡献方式请参考 [CONTRIBUTING.md](CONTRIBUTING.md)
 

@@ -5,6 +5,7 @@
 .claude/
 .gemini/
 .codex*/
+.agents/
 
 .env
 .env.*

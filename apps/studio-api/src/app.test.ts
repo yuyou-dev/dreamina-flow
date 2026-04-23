@@ -111,9 +111,11 @@ vi.mock("./adapter.js", () => ({
       sessionId: `login-session-${++loginSessionCounter}`,
       mode,
       phase: "pending",
-      qrText: "QR::TEST::PAYLOAD",
-      qrImageDataUrl: "data:image/png;base64,TEST",
-      message: "Waiting for Dreamina headless login to complete.",
+      terminalOutput: "verification_uri: https://dreamina.example/device\nuser_code: TEST-CODE\ndevice_code: device-code-123",
+      verificationUri: "https://dreamina.example/device",
+      userCode: "TEST-CODE",
+      deviceCode: "device-code-123",
+      message: "Waiting for Dreamina OAuth device authorization to complete.",
       startedAt: "2026-04-13T00:00:00.000Z",
       finishedAt: null,
     };
@@ -220,8 +222,10 @@ describe("studio-api", () => {
 
       expect(created.mode).toBe("relogin");
       expect(created.phase).toBe("pending");
-      expect(created.qrText).toContain("QR::TEST::PAYLOAD");
-      expect(created.qrImageDataUrl).toContain("data:image/png");
+      expect(created.terminalOutput).toContain("verification_uri");
+      expect(created.verificationUri).toContain("dreamina.example/device");
+      expect(created.userCode).toBe("TEST-CODE");
+      expect(created.deviceCode).toBe("device-code-123");
 
       const fetched = await fetch(`${baseUrl}/api/adapter/login/${created.sessionId}`).then((response) => response.json());
       expect(fetched.sessionId).toBe(created.sessionId);
