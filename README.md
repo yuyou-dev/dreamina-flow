@@ -1,49 +1,65 @@
 # Workflow Studio OSS
 
-把 Dreamina CLI 包装成可视化 workflow studio 的开源示例仓库。这个仓库包含四层能力：`workflow-core` 负责 workflow schema 和执行语义，`dreamina-adapter` 负责把 Dreamina CLI 包装成可复用节点，`studio-api` 提供最小 HTTP API，`studio-web` 提供可交互的 React Flow 画布。最近一次对齐重点放在新版 Dreamina CLI 的 OAuth Device Flow 登录链路上，Studio 会直接展示 `verification_uri`、`user_code`、`device_code`，并在登录成功后自动恢复被阻塞的运行动作。
+> 把 Dreamina CLI 变成可视化 workflow studio 的开源示例仓库
 
-![Workflow Studio OSS Comic Intro](docs/comic-project-intro/contact-sheet.png)
+![Workflow Studio OSS 首屏插画，展示可视化工作流画布、Dreamina CLI 终端桥接和四层仓库结构](docs/illustrated-readme/2026-04-24-style-ref-readme/images/hero.png)
 
-## 项目简介
+Workflow Studio OSS 把 Dreamina CLI 包装成一个可以在浏览器里编辑、导入、导出和运行的本地 workflow studio。仓库把 schema、执行语义、CLI 适配、最小 HTTP API 和 React Flow 画布拆成独立层，适合用来验证一套完整的本地工作流链路。
 
-这个项目适合你在本地快速验证三件事：
+这份 README 先回答项目是什么、能解决什么，再把四层结构、运行链路、快速启动和验证入口摆清楚。文中的插画通过 Codex CLI 内置 `gpt-image-2` 生成，视觉方向参考 `style-ref/style-reference.jpg` 的蓝白拼贴版式，但内容只使用仓库中的真实事实。
 
-- 如何把 Dreamina CLI 组织成节点化 workflow
-- 如何通过浏览器画布编辑、导入、导出和运行 workflow
-- 如何把登录状态、素材上传、节点运行和结果轮询串成完整链路
-- 如何把新版 Dreamina OAuth Device Flow 接进本地工作台，而不是只停留在 CLI 终端里
+## 核心亮点
 
-仓库内已经包含 starter workflow、示例 workflow、最小后端和前端界面，clone 后即可本地运行。
+- 把 Dreamina CLI 封装成可复用节点，而不是停留在终端命令层。
+- 在浏览器工作台中编辑、连接、运行 workflow，并查看结果回写。
+- 支持导入导出 `.workflow.json`，格式对齐 `workflow.document/v1alpha1`。
+- 内置 starter workflow 与示例 workflow，便于本地快速验证。
+- 登录流已切到 OAuth Device Flow，登录成功后会恢复被阻塞的动作。
 
-## README 导览组图
+## 项目价值速览
 
-下面这组 16:9 组图会先带你看一遍项目，再往下看具体命令和说明：
+![Workflow Studio OSS 能力看板插画，展示节点化 Dreamina CLI、浏览器运行 workflow、导入导出 workflow 文件、示例流程和登录恢复能力](docs/illustrated-readme/2026-04-24-style-ref-readme/images/highlights.png)
 
-<p align="center">
-  <img src="docs/comic-project-intro/page-01-cover.png" width="49%" alt="Workflow Studio OSS 封面导览页" />
-  <img src="docs/comic-project-intro/page-02-architecture.png" width="49%" alt="Workflow Studio OSS 四层架构导览页" />
-</p>
-<p align="center">
-  <img src="docs/comic-project-intro/page-03-login-flow.png" width="49%" alt="Workflow Studio OSS 登录流程导览页" />
-  <img src="docs/comic-project-intro/page-04-workflow-run.png" width="49%" alt="Workflow Studio OSS 运行链路导览页" />
-</p>
+这个仓库的核心价值不是再造一个通用流程引擎，而是把 Dreamina CLI 的可执行能力、登录状态和任务轮询真正拉进一个本地可视化工作台。对想验证 workflow 编排、Dreamina 节点封装和 UI/API/CLI 联动的人来说，这个仓库已经给出了最小而完整的骨架。
 
-这组图的源文件、风格包和分镜说明放在 `docs/comic-project-intro/` 目录下。
+如果你只是想快速判断项目是否适合自己，先看这五个点：节点化封装、浏览器运行、标准化 workflow 文件、内置样例，以及设备登录恢复链路。
 
-## 当前支持范围
+- 工作流画布建立在 `apps/studio-web`，依赖 React 19、Vite 6 和 `@xyflow/react`。
+- 最小 API 位于 `apps/studio-api`，通过 Express 暴露运行、登录、上传和任务查询入口。
+- Dreamina CLI 适配封装在 `packages/dreamina-adapter`，负责节点定义、登录、运行和结果查询。
+- Workflow schema 与执行语义落在 `packages/workflow-core`，统一使用 `workflow.document/v1alpha1`。
 
-- 当前仓库只在 `macOS` 上验证和支持
-- Dreamina CLI 官方安装脚本本身支持多平台，但本仓库当前只提供 `macOS` 的开源使用说明
-- 默认开发端口固定为 `3000`（Web）和 `3100`（API），启动前请先确保这两个端口空闲
+## 四层结构
 
-## 环境要求
+![Workflow Studio OSS 四层结构插画，展示 studio-web、studio-api、dreamina-adapter 和 workflow-core 的职责分工与调用方向](docs/illustrated-readme/2026-04-24-style-ref-readme/images/architecture.png)
 
-- `macOS`
-- `Node.js 20+`
-- `npm 10+`
-- 本地可用的 `python3`
+仓库按职责拆成四层。`apps/studio-web` 负责画布、交互和状态展示；`apps/studio-api` 负责把浏览器请求编排成最小 HTTP 能力；`packages/dreamina-adapter` 负责把 Dreamina CLI 包装成节点定义与运行接口；`packages/workflow-core` 定义 schema、导入导出格式和执行语义。
 
-## 安装 Dreamina CLI
+这种拆法的好处是，浏览器界面、HTTP 边界、CLI 对接和 workflow 语义互相解耦。你可以单独改 schema、补 adapter 节点或替换前端表现，而不会把整个链路搅成一个应用。
+
+- `GET /api/capabilities` 让前端拿到节点定义和系统能力。
+- `POST /api/flows/run` 负责提交完整 `nodes + edges + targetNodeId` 的整链运行。
+- `packages/workflow-core` 负责导入导出、兼容性检查、多输入顺序和 pending flow 恢复逻辑。
+- `packages/dreamina-adapter` 暴露 `discoverNodeDefinitions()`、`login()`、`runNode()`、`queryRunResult()` 等关键能力。
+
+## 一次请求怎么跑完
+
+![Workflow Studio OSS 运行链路插画，展示画布编辑、节点运行、OAuth Device Flow 登录恢复与任务结果回写](docs/illustrated-readme/2026-04-24-style-ref-readme/images/workflow.png)
+
+实际运行时，前端先读取 `/api/capabilities` 和 `/api/adapter/status` 建立画布与系统状态，再根据操作场景触发单节点运行或整链运行。若当前 Dreamina CLI 尚未登录，前端会引导 headless 设备登录，并把 `verification_uri`、`user_code`、`device_code` 直接展示在界面里。
+
+登录成功后，之前被阻塞的运行会自动恢复。提交成功的任务继续通过 `/api/tasks/:submitId` 轮询，节点保持 `querying`，直到结果和产物回写到输出节点。
+
+- 单节点路径：先调用 `/api/nodes/:type/validate`，再调用 `/api/nodes/:type/run`。
+- 整链路径：提交完整 workflow 到 `/api/flows/run`，由 API 解析 processor chain 并调用 adapter。
+- 设备登录使用 `dreamina login --headless` / `dreamina relogin --headless`，再用 `dreamina login checklogin --device_code=...` 轮询。
+- 登录 UI 优先覆盖 OAuth Device Flow，如果 CLI 输出旧 QR 形式，界面会按兼容信息显示。
+
+## 快速开始
+
+![Workflow Studio OSS 快速开始插画，展示安装 Dreamina CLI、npm install、npm run dev、默认端口和环境要求](docs/illustrated-readme/2026-04-24-style-ref-readme/images/quick-start.png)
+
+当前仓库只在 `macOS` 上验证，默认端口固定为 `3000`（Web）和 `3100`（API）。在本地环境满足 `Node.js 20+`、`npm 10+` 和可用 `python3` 之后，可以直接按下面的顺序启动。
 
 先安装 Dreamina CLI：
 
@@ -51,7 +67,7 @@
 curl -fsSL https://jimeng.jianying.com/cli | bash
 ```
 
-安装完成后，执行下面几条命令确认 CLI 已经准备好：
+安装完成后，建议先确认 CLI 可用：
 
 ```bash
 dreamina version
@@ -62,36 +78,19 @@ dreamina query_result -h
 dreamina user_credit
 ```
 
-说明：
-
-- 新版 `dreamina login --headless` / `dreamina relogin --headless` 会打印 `verification_uri`、`user_code` 和 `device_code`
-- 如果你想在终端里手动确认登录进度，可执行 `dreamina login checklogin --device_code=<device_code> --poll=30`
-- Studio 的账户状态面板会直接读取这些字段，并在后台自动轮询 `dreamina login checklogin`
-- 如果你是在运行 `Run Node` / `Run Chain` 时被登录拦住，登录成功后会自动恢复一次被阻塞的动作
-- 如果命令无法执行，请先确认 Dreamina CLI 已经加入 `PATH`
-
-![Current System Status](docs/comic-project-intro/browser-system-status.png)
-
-## 安装项目依赖
-
-在仓库根目录执行：
+然后在仓库根目录执行：
 
 ```bash
 npm install
-```
-
-## 启动项目
-
-```bash
 npm run dev
 ```
 
 启动成功后：
 
-- Web: `http://127.0.0.1:3000`
-- API: `http://127.0.0.1:3100`
-
-![Current Starter Canvas](docs/comic-project-intro/browser-canvas.png)
+- Web 地址：`http://127.0.0.1:3000`
+- API 地址：`http://127.0.0.1:3100`
+- 启动前请先确认端口 `3000` 与 `3100` 空闲。
+- 如果 `dreamina` 命令不可用，请先检查 Dreamina CLI 是否已进入 `PATH`。
 
 ## 第一次操作流程
 
@@ -103,31 +102,15 @@ npm run dev
 6. 点击节点上的 `Run Node`，或点击链路上的 `Run Chain`
 7. 等待结果回写到输出节点
 
-## 示例 Workflow
+## 示例 workflow 与验证入口
 
-仓库自带了几个可直接导入的示例：
+仓库已经提供了可直接导入的示例 workflow，路径位于 `resources/workflows/`。如果你想先验证导入导出、分支运行和多素材链路，可以直接从这些文件开始。
 
 - `resources/workflows/fanout-image-derivatives.workflow.json`
 - `resources/workflows/three-image-branching.workflow.json`
 - `resources/workflows/three-image-reference-video.workflow.json`
 
-导入方式：
-
-1. 启动项目
-2. 点击顶部的 `Upload Workflow`
-3. 选择 `resources/workflows/` 目录下的任意 `.workflow.json` 文件
-
-## Dreamina CLI 对齐说明
-
-- 所有生成节点现在都暴露可选的 `session` 参数；留空时由 Dreamina CLI 使用默认 session `0`
-- 对于新版 CLI 明确支持“省略并走默认值”的字段，Studio 不再强行写死参数
-- `image2video` 留空 `model_version` 时走基础路径；只有填写 `model_version` / `duration` / `video_resolution` 时才进入 advanced controls
-- 登录流已切到 OAuth Device Flow：Studio 会读取 `verification_uri` / `user_code` / `device_code`，并在后台自动轮询 `dreamina login checklogin`
-- 当前 UI / API 仍未直接暴露 `list_task`、`session create/list/search/rename/delete`；这些仍然是 CLI-first 能力
-
-## 验证命令
-
-在仓库根目录执行：
+完成依赖安装后，建议至少跑一次类型检查、测试、构建和 schema 校验，确保当前改动没有破坏既有链路。
 
 ```bash
 npm run typecheck
@@ -137,14 +120,12 @@ node ./scripts/migrate-workflow-schema.mjs --check
 npm run audit:cli-help
 ```
 
-## 常见说明
+## 说明
 
-- `npm run dev` 依赖 `3000` 和 `3100` 两个默认端口；如果端口被占用，请先释放再启动
-- 这个仓库当前的定位是开源源码仓库，不包含远程部署、账号托管或云端服务
-- 登录、积分、设备授权信息和运行状态都通过本地 Dreamina CLI 驱动
-- 登录 UI 当前优先覆盖 headless OAuth Device Flow；如果 CLI 仍输出旧 QR 标记，UI 会把它当成兼容兜底信息显示
-- 更多实现细节可参考 [docs/technical-overview.md](docs/technical-overview.md) 和 [docs/workflow-json-format.md](docs/workflow-json-format.md)
-- 贡献方式请参考 [CONTRIBUTING.md](CONTRIBUTING.md)
+- 当前仓库定位为本地开源源码仓库，不包含远程部署、账号托管或云端服务。
+- 登录、积分、设备授权信息和运行状态都通过本地 Dreamina CLI 驱动。
+- 更多实现细节可继续参考 [docs/technical-overview.md](docs/technical-overview.md) 与 [docs/workflow-json-format.md](docs/workflow-json-format.md)。
+- 贡献方式请参考 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 许可证
 
