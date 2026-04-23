@@ -6,6 +6,7 @@
 .gemini/
 .codex*/
 .agents/
+style-ref/
 
 .env
 .env.*

@@ -1,8 +1,8 @@
 # Workflow Studio OSS
 
-把 Dreamina CLI 包装成可视化 workflow studio 的开源示例仓库。这个仓库包含四层能力：`workflow-core` 负责 workflow schema 和执行语义，`dreamina-adapter` 负责把 Dreamina CLI 包装成可复用节点，`studio-api` 提供最小 HTTP API，`studio-web` 提供可交互的 React Flow 画布。
+把 Dreamina CLI 包装成可视化 workflow studio 的开源示例仓库。这个仓库包含四层能力：`workflow-core` 负责 workflow schema 和执行语义，`dreamina-adapter` 负责把 Dreamina CLI 包装成可复用节点，`studio-api` 提供最小 HTTP API，`studio-web` 提供可交互的 React Flow 画布。最近一次对齐重点放在新版 Dreamina CLI 的 OAuth Device Flow 登录链路上，Studio 会直接展示 `verification_uri`、`user_code`、`device_code`，并在登录成功后自动恢复被阻塞的运行动作。
 
-![Starter Canvas](docs/screenshots/starter-canvas.png)
+![Workflow Studio OSS Comic Intro](docs/comic-project-intro/contact-sheet.png)
 
 ## 项目简介
 
@@ -11,8 +11,24 @@
 - 如何把 Dreamina CLI 组织成节点化 workflow
 - 如何通过浏览器画布编辑、导入、导出和运行 workflow
 - 如何把登录状态、素材上传、节点运行和结果轮询串成完整链路
+- 如何把新版 Dreamina OAuth Device Flow 接进本地工作台，而不是只停留在 CLI 终端里
 
 仓库内已经包含 starter workflow、示例 workflow、最小后端和前端界面，clone 后即可本地运行。
+
+## README 导览组图
+
+下面这组 16:9 组图会先带你看一遍项目，再往下看具体命令和说明：
+
+<p align="center">
+  <img src="docs/comic-project-intro/page-01-cover.png" width="49%" alt="Workflow Studio OSS 封面导览页" />
+  <img src="docs/comic-project-intro/page-02-architecture.png" width="49%" alt="Workflow Studio OSS 四层架构导览页" />
+</p>
+<p align="center">
+  <img src="docs/comic-project-intro/page-03-login-flow.png" width="49%" alt="Workflow Studio OSS 登录流程导览页" />
+  <img src="docs/comic-project-intro/page-04-workflow-run.png" width="49%" alt="Workflow Studio OSS 运行链路导览页" />
+</p>
+
+这组图的源文件、风格包和分镜说明放在 `docs/comic-project-intro/` 目录下。
 
 ## 当前支持范围
 
@@ -50,9 +66,11 @@ dreamina user_credit
 
 - 新版 `dreamina login --headless` / `dreamina relogin --headless` 会打印 `verification_uri`、`user_code` 和 `device_code`
 - 如果你想在终端里手动确认登录进度，可执行 `dreamina login checklogin --device_code=<device_code> --poll=30`
+- Studio 的账户状态面板会直接读取这些字段，并在后台自动轮询 `dreamina login checklogin`
+- 如果你是在运行 `Run Node` / `Run Chain` 时被登录拦住，登录成功后会自动恢复一次被阻塞的动作
 - 如果命令无法执行，请先确认 Dreamina CLI 已经加入 `PATH`
 
-![System Status](docs/screenshots/system-status.png)
+![Current System Status](docs/comic-project-intro/browser-system-status.png)
 
 ## 安装项目依赖
 
@@ -72,6 +90,8 @@ npm run dev
 
 - Web: `http://127.0.0.1:3000`
 - API: `http://127.0.0.1:3100`
+
+![Current Starter Canvas](docs/comic-project-intro/browser-canvas.png)
 
 ## 第一次操作流程
 
